@@ -1,0 +1,7 @@
+build/*
+*.pkl
+*.pyc
+slowfast.egg-info/*
+scores.csv
+predictions.json
+stdout.log

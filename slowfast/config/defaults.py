@@ -761,6 +761,11 @@ _C.DEMO.SLOWMO = 1
 # Add custom config with default values.
 custom_config.add_custom_config(_C)
 
+# Path to all predicted classes
+_C.DEMO.SCORES_FILE_PATH = "scores.csv"
+
+# Path to best predicted classes
+_C.DEMO.PREDICTIONS_FILE_PATH = "predictions.json"
 
 def _assert_and_infer_cfg(cfg):
     # BN assertions.
