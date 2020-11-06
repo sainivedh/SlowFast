@@ -145,7 +145,7 @@ class HungarianTracker():
             ids: [int]
         """
         def get_crop(bounding_box):
-            x1, y1, x2, y2 = bounding_box
+            x1, y1, x2, y2 = bounding_box.int()
             crop = new_frame[y1:y2, x1:x2] # extract crop
             return crop
         # Batch all new boxes
@@ -168,7 +168,7 @@ class HungarianTracker():
                 score = self.compare_embeddings(self.embeddings[j], new_embeddings[i,])
                 new_matrix[j, i] = score
 
-        row_idx, col_idx = linear_sum_assignment(new_matrix, maximize=True)
+        row_idx, col_idx = linear_sum_assignment(new_matrix, maximize=False)
         self.current_task_id += 1
         new_ids = [
             self.new_id() if i not in col_idx else 0

@@ -62,12 +62,13 @@ TEST:
 DATA_LOADER:
   NUM_WORKERS: 0
   PIN_MEMORY: True
-NUM_GPUS: 8
+NUM_GPUS: 1
 NUM_SHARDS: 1
 RNG_SEED: 0
 OUTPUT_DIR: .
 DEMO:
   ENABLE: True
+  THREAD_ENABLE: False
   OUTPUT_FILE: test_output.mp4
   LABEL_FILE_PATH: "SlowFast/ava_classnames.json"
   INPUT_VIDEO: test.mp4  # Path to a video file or image folder
