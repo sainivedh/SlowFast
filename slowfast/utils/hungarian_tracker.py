@@ -9,7 +9,7 @@ from scipy.stats import multivariate_normal
 
 import torch
 import torchvision
-
+from slowfast.utils import feature_extractor
 
 def metrics(bb1, bb2):
     def to_tuple(bb):
@@ -54,55 +54,16 @@ def metrics(bb1, bb2):
     return iou, hdiff, wdiff, cd
 
 
-def get_gaussian_mask():
-    #128 is image size
-    x, y = np.mgrid[0:1.0:128j, 0:1.0:128j]
-    xy = np.column_stack([x.flat, y.flat])
-    mu = np.array([0.5,0.5])
-    sigma = np.array([0.22,0.22])
-    covariance = np.diag(sigma**2)
-    z = multivariate_normal.pdf(xy, mean=mu, cov=covariance)
-    z = z.reshape(x.shape)
-
-    z = z / z.max()
-    z  = z.astype(np.float32)
-
-    mask = torch.from_numpy(z)
-
-    return mask
-
-
-class FeatureEncoder():
-    def __init__(self, weight_path="ckpts/model640.pt"):
-        self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-        self.model = torch.load(weight_path).to(self.device)
-        self.gaussian_mask = get_gaussian_mask().to(self.device)
-        self.pre_process = torchvision.transforms.Compose([
-            torchvision.transforms.ToPILImage(),
-            torchvision.transforms.Resize((128, 128)),
-            torchvision.transforms.ToTensor(),
-        ])
-
-    def process_crops(self, crops):
-        """Return embeddings for the crop"""
-        input_tensors = torch.stack([self.pre_process(crop) for crop in crops]).to(self.device)
-        input_batch = input_tensors * self.gaussian_mask
-        with torch.no_grad():
-            features = self.model.forward_once(input_batch)
-        features = features.detach().cpu().numpy()
-        return features
-
-
 def download_file(url, file_path):
     urllib.request.urlretrieve(url, file_path)
 
 
-def load_encoder(weight_path="model640.pt"):
-    if not os.path.isfile(weight_path):
+def load_encoder(model_path="mars-small128.pb"):
+    if not os.path.isfile(model_path):
         download_file(
-            'https://github.com/abhyantrika/nanonets_object_tracking/raw/master/ckpts/model640.pt',
-            weight_path)
-    return FeatureEncoder(weight_path)
+            'https://github.com/theAIGuysCode/yolov4-deepsort/blob/9e745bfb3ea5e7c7505cb11a8e8654f5b1319ad9/model_data/mars-small128.pb?raw=true',
+            model_path)
+    return feature_extractor.create_box_encoder(model_path, batch_size=1)
 
 
 class HungarianTracker():
@@ -144,12 +105,9 @@ class HungarianTracker():
         -------
             ids: [int]
         """
-        def get_crop(bounding_box):
-            x1, y1, x2, y2 = bounding_box.int()
-            crop = new_frame[y1:y2, x1:x2] # extract crop
-            return crop
+        
         # Batch all new boxes
-        new_embeddings = self.encoder.process_crops([get_crop(bb) for bb in new_bounding_boxes])
+        new_embeddings = self.encoder(new_frame, new_bounding_boxes)
 
         if self.current_task_id == 0:  # first task
             self.tracking = new_bounding_boxes
@@ -165,10 +123,12 @@ class HungarianTracker():
 
         for i, bounding_box in enumerate(new_bounding_boxes):
             for j, tracked_bounding_box in enumerate(self.tracking):
+                iou, hdiff, wdiff, cd = metrics(bounding_box, tracked_bounding_box)
                 score = self.compare_embeddings(self.embeddings[j], new_embeddings[i,])
-                new_matrix[j, i] = score
+                new_matrix[j, i] = iou+score
+                # new_matrix[j, i] = iou if iou !=0 else -cd/1000
 
-        row_idx, col_idx = linear_sum_assignment(new_matrix, maximize=False)
+        row_idx, col_idx = linear_sum_assignment(new_matrix, maximize=True)
         self.current_task_id += 1
         new_ids = [
             self.new_id() if i not in col_idx else 0
