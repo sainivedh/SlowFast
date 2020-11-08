@@ -137,5 +137,6 @@ class HungarianTracker():
             new_ids[col] = self.ids[row]  # reuse id if match
         self.tracking = new_bounding_boxes
         self.ids = new_ids
+        self.embeddings = new_embeddings
 
         return self.ids
