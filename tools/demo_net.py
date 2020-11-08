@@ -56,7 +56,7 @@ def run_demo(cfg, frame_provider):
     async_vis = AsyncVis(video_vis, n_workers=cfg.DEMO.NUM_VIS_INSTANCES)
 
     if cfg.NUM_GPUS <= 1:
-        model = ActionPredictor(cfg=cfg, async_vis=async_vis)
+        model = ActionPredictor(cfg=cfg, vis=video_vis)
     else:
         model = AsyncDemo(cfg=cfg, async_vis=async_vis)
 

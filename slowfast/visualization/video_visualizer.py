@@ -634,8 +634,12 @@ class VideoVisualizer:
         frames = frames[repeated_seq]
         img_ls = []
 
+        if mid is not None:
+            mid_frame = frames[mid]
+        else:
+            mid_frame = frames[half_left]
         if bboxes is not None:
-            box_ids = self.tracker.advance(bboxes)
+            box_ids = self.tracker.advance(bboxes, mid_frame)
             with open(scores_path, 'a+') as f:
               for bbox, pred, box_id in zip(bboxes, preds, box_ids):
                 f.write(f'{self.tracker.current_task_id},{box_id},{str(bbox.tolist()).strip("[]")},{str(pred.tolist()).strip("[]")}\n')

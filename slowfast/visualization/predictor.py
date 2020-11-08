@@ -2,6 +2,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 import queue
+import numpy as np
 import cv2
 import torch
 from detectron2 import model_zoo
@@ -12,7 +13,7 @@ import slowfast.utils.checkpoint as cu
 from slowfast.datasets import cv2_transform
 from slowfast.models import build_model
 from slowfast.utils import logging
-from slowfast.visualization.utils import process_cv2_inputs
+from slowfast.visualization.utils import process_cv2_inputs, draw_predictions
 
 logger = logging.get_logger(__name__)
 
@@ -118,10 +119,10 @@ class Predictor:
 
 class ActionPredictor:
     """
-    Synchronous Action Prediction and Visualization pipeline with AsyncVis.
+    Synchronous Action Prediction and Visualization pipeline with AsyncVis or SyncVis.
     """
 
-    def __init__(self, cfg, async_vis=None, gpu_id=None):
+    def __init__(self, cfg, async_vis=None, vis=None, gpu_id=None):
         """
         Args:
             cfg (CfgNode): configs. Details can be found in
@@ -130,7 +131,12 @@ class ActionPredictor:
             gpu_id (Optional[int]): GPU id.
         """
         self.predictor = Predictor(cfg=cfg, gpu_id=gpu_id)
-        self.async_vis = async_vis
+        self.is_async = async_vis is not None
+        if async_vis is not None:
+            self.async_vis = async_vis
+        else:
+            self.vis = vis
+            self.vis_queue = queue.Queue()
 
     def put(self, task):
         """
@@ -140,6 +146,11 @@ class ActionPredictor:
                 the necessary information for action prediction. (e.g. frames, boxes)
         """
         task = self.predictor(task)
+        if not self.is_async:
+            frames = draw_predictions(task, self.vis)
+            task.frames = np.array(frames)
+            self.vis_queue.put(task)
+            return
         self.async_vis.get_indices_ls.append(task.id)
         self.async_vis.put(task)
 
@@ -147,6 +158,12 @@ class ActionPredictor:
         """
         Get the visualized clips if any.
         """
+        if not self.is_async:
+            try:
+                task = self.vis_queue.get()
+            except (queue.Empty, IndexError):
+                raise IndexError("No results to get")
+            return task
         try:
             task = self.async_vis.get()
         except (queue.Empty, IndexError):
