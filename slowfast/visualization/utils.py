@@ -24,6 +24,17 @@ def draw_predictions(task, video_vis):
         video_vis (VideoVisualizer object): the video visualizer object.
     """
 
+    nbboxes = task.nbboxes
+    if nbboxes is not None:
+        img_width = task.img_width
+        img_height = task.img_height
+        for i, frame_boxes in enumerate(nbboxes):
+            if frame_boxes.device != torch.device("cpu"):
+                frame_boxes = frame_boxes.cpu()
+            frame_boxes = cv2_transform.revert_scaled_boxes(
+                task.crop_size, frame_boxes, img_height, img_width
+            )
+            nbboxes[i] = frame_boxes
     boxes = task.bboxes
     frames = task.frames
     preds = task.action_preds
@@ -49,8 +60,9 @@ def draw_predictions(task, video_vis):
                 frames,
                 preds,
                 boxes,
+                nbboxes=nbboxes,
                 keyframe_idx=keyframe_idx,
-                draw_range=draw_range,
+                # draw_range=draw_range,
             )
     else:
         frames = video_vis.draw_clip_range(
@@ -392,6 +404,7 @@ class TaskInfo:
         self.frames = None
         self.id = -1
         self.bboxes = None
+        self.nbboxes = None
         self.action_preds = None
         self.num_buffer_frames = 0
         self.img_height = -1
@@ -408,6 +421,9 @@ class TaskInfo:
         """
         self.frames = frames
         self.id = idx
+
+    def add_nbboxes(self, nbboxes):
+        self.nbboxes = nbboxes
 
     def add_bboxes(self, bboxes):
         """
