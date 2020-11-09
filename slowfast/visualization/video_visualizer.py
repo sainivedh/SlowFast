@@ -407,7 +407,7 @@ class VideoVisualizer:
     def draw_one_frame(
         self,
         frame,
-        preds,
+        preds=None,
         bboxes=None,
         alpha=0.5,
         text_alpha=0.7,
@@ -441,10 +441,11 @@ class VideoVisualizer:
         elif isinstance(preds, list):
             n_instances = len(preds)
         else:
-            logger.error("Unsupported type of prediction input.")
-            return
+            n_instances = 0
 
-        if ground_truth:
+        if preds is None:
+            pass
+        elif ground_truth:
             top_scores, top_classes = [None] * n_instances, preds
 
         elif self.mode == "top-k":
@@ -475,17 +476,13 @@ class VideoVisualizer:
         )
         top_corner = not ground_truth
         if bboxes is not None:
-            assert len(preds) == len(
-                bboxes
-            ), "Encounter {} predictions and {} bounding boxes".format(
-                len(preds), len(bboxes)
-            )
+            if preds is not None:
+                assert len(preds) == len(
+                    bboxes
+                ), "Encounter {} predictions and {} bounding boxes".format(
+                    len(preds), len(bboxes)
+                )
             for i, box in enumerate(bboxes):
-                text = text_labels[i]
-                box_id = box_ids[i]
-                pred_class = top_classes[i]
-                colors = [self._get_color(pred) for pred in pred_class]
-
                 box_color = "r" if ground_truth else "g"
                 line_style = "--" if ground_truth else "-."
                 frame_visualizer.draw_box(
@@ -494,21 +491,28 @@ class VideoVisualizer:
                     edge_color=box_color,
                     line_style=line_style,
                 )
-                frame_visualizer.draw_multiple_text(
-                    [f"id: {box_id}"],
-                    box,
-                    top_corner=False,
-                    font_size=font_size,
-                    alpha=text_alpha,
-                )
-                frame_visualizer.draw_multiple_text(
-                    text,
-                    box,
-                    top_corner=top_corner,
-                    font_size=font_size,
-                    box_facecolors=colors,
-                    alpha=text_alpha,
-                )
+                if box_ids is not None:
+                    box_id = box_ids[i]
+                    frame_visualizer.draw_multiple_text(
+                        [f"id: {box_id}"],
+                        box,
+                        top_corner=False,
+                        font_size=font_size,
+                        alpha=text_alpha,
+                    )
+                if preds is not None:
+                    text = text_labels[i]
+                    pred_class = top_classes[i]
+                    colors = [self._get_color(pred) for pred in pred_class]
+
+                    frame_visualizer.draw_multiple_text(
+                        text,
+                        box,
+                        top_corner=top_corner,
+                        font_size=font_size,
+                        box_facecolors=colors,
+                        alpha=text_alpha,
+                    )
         else:
             text = text_labels[0]
             pred_class = top_classes[0]
@@ -529,6 +533,7 @@ class VideoVisualizer:
         frames,
         preds,
         bboxes=None,
+        nbboxes=None,
         text_alpha=0.5,
         ground_truth=False,
         keyframe_idx=None,
@@ -568,6 +573,7 @@ class VideoVisualizer:
                 draw_frames,
                 preds,
                 bboxes=bboxes,
+                nbboxes=nbboxes,
                 text_alpha=text_alpha,
                 ground_truth=ground_truth,
                 keyframe_idx=keyframe_idx - draw_range[0],
@@ -583,6 +589,7 @@ class VideoVisualizer:
         frames,
         preds,
         bboxes=None,
+        nbboxes=None,
         text_alpha=0.5,
         ground_truth=False,
         keyframe_idx=None,
@@ -597,6 +604,7 @@ class VideoVisualizer:
             preds (tensor): a tensor of shape (num_boxes, num_classes) that contains all of the confidence scores
                 of the model. For recognition task or for ground_truth labels, input shape can be (num_classes,).
             bboxes (Optional[tensor]): shape (num_boxes, 4) that contains the coordinates of the bounding boxes.
+            nbboxes (Optional[tensor]): shape (num_boxes, 4, N) that contains the bounding boxes from the object detector
             text_alpha (float): transparency label of the box wrapped around text labels.
             ground_truth (bool): whether the prodived bounding boxes are ground-truth.
             keyframe_idx (int): the index of keyframe in the clip.
@@ -639,13 +647,14 @@ class VideoVisualizer:
         else:
             mid_frame = frames[half_left]
         if bboxes is not None:
+            # TODO: Pass nbboxes if they exists
             box_ids = self.tracker.advance(bboxes, mid_frame)
             with open(scores_path, 'a+') as f:
               for bbox, pred, box_id in zip(bboxes, preds, box_ids):
                 f.write(f'{self.tracker.current_task_id},{box_id},{str(bbox.tolist()).strip("[]")},{str(pred.tolist()).strip("[]")}\n')
         else:
             box_ids = None
-        for alpha, frame in zip(alpha_ls, frames):
+        for i, (alpha, frame) in enumerate(zip(alpha_ls, frames)):
             draw_img = self.draw_one_frame(
                 frame,
                 preds,
@@ -655,6 +664,14 @@ class VideoVisualizer:
                 ground_truth=ground_truth,
                 box_ids=box_ids,
             )
+            if nbboxes is not None:
+                draw_img = self.draw_one_frame(
+                    draw_img,
+                    preds=None,
+                    bboxes=nbboxes[i],
+                    alpha=1,
+                    text_alpha=text_alpha,
+                )
             if adjusted:
                 draw_img = draw_img.astype("float32") / 255
 

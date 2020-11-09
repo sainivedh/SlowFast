@@ -47,6 +47,14 @@ class Predictor:
         cu.load_test_checkpoint(cfg, self.model)
         logger.info("Finish loading model weights")
 
+    def predict_frame(self, frame):
+        """
+        Uses the underlying object detector to return bounding boxes
+        """
+        if not self.cfg.DETECTION.ENABLE:
+            raise Exception("object detector is not enabled")
+        return self.object_detector.predict_frame(frame)
+
     def __call__(self, task):
         """
         Returns the prediction results for the current task.
@@ -61,7 +69,7 @@ class Predictor:
         if self.cfg.DETECTION.ENABLE:
             task = self.object_detector(task)
 
-        frames, bboxes = task.frames, task.bboxes
+        frames, bboxes, nbboxes = task.frames, task.bboxes, task.nbboxes
         if bboxes is not None:
             bboxes = cv2_transform.scale_boxes(
                 self.cfg.DATA.TEST_CROP_SIZE,
@@ -69,6 +77,14 @@ class Predictor:
                 task.img_height,
                 task.img_width,
             )
+        if nbboxes is not None:
+            for i, frame_boxes in enumerate(nbboxes):
+                nbboxes[i] = cv2_transform.scale_boxes(
+                    self.cfg.DATA.TEST_CROP_SIZE,
+                    frame_boxes,
+                    task.img_height,
+                    task.img_width,
+                )
         if self.cfg.DEMO.INPUT_FORMAT == "BGR":
             frames = [
                 cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) for frame in frames
@@ -203,6 +219,19 @@ class Detectron2Predictor:
 
         self.predictor = DefaultPredictor(self.cfg)
 
+    def predict_frame(self, frame):
+        """
+        Returns bounding boxes for human on a single frame
+        Args:
+            frame (ndarray): the frame
+        Returns:
+            bounding_boxes (ndarray): the bounding boxes for the subjects
+        """
+        outputs = self.predictor(frame)
+        mask = outputs["instances"].pred_classes == 0
+        pred_boxes = outputs["instances"].pred_boxes.tensor[mask]
+        return pred_boxes
+
     def __call__(self, task):
         """
         Return bounding boxes predictions as a tensor.
@@ -215,10 +244,11 @@ class Detectron2Predictor:
                 action detection task.
         """
         middle_frame = task.frames[len(task.frames) // 2]
-        outputs = self.predictor(middle_frame)
-        # Get only human instances
-        mask = outputs["instances"].pred_classes == 0
-        pred_boxes = outputs["instances"].pred_boxes.tensor[mask]
+        pred_boxes = self.predict_frame(middle_frame)
         task.add_bboxes(pred_boxes)
 
+        # TODO: batch frames
+        nbboxes = [self.predict_frame(frame) for frame in task.frames]
+        task.add_nbboxes(nbboxes)
+       
         return task
