@@ -764,6 +764,9 @@ custom_config.add_custom_config(_C)
 # Path to all predicted classes
 _C.DEMO.SCORES_FILE_PATH = "scores.csv"
 
+# Whether or not to draw the still boxes
+_C.DEMO.DRAW_STATIC_BOXES = True
+
 # Path to best predicted classes
 _C.DEMO.PREDICTIONS_FILE_PATH = "predictions.json"
 

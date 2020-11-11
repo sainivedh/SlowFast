@@ -10,7 +10,7 @@ from detectron2.utils.visualizer import Visualizer
 
 import slowfast.utils.logging as logging
 from slowfast.utils.misc import get_class_names
-from slowfast.utils.tracker import DeepSortTracker
+from slowfast.utils.tracker import DeepSortTracker, match_boxes
 from slowfast.utils.parser import load_config, parse_args
 
 logger = logging.get_logger(__name__)
@@ -613,6 +613,7 @@ class VideoVisualizer:
         args = parse_args()
         cfg = load_config(args)
         scores_path = cfg.DEMO.SCORES_FILE_PATH
+        draw_static_boxes = cfg.DEMO.DRAW_STATIC_BOXES
 
         assert repeat_frame >= 1, "`repeat_frame` must be a positive integer."
 
@@ -646,34 +647,53 @@ class VideoVisualizer:
             mid_frame = frames[mid]
         else:
             mid_frame = frames[half_left]
-        if bboxes is not None:
-            if nbboxes is None:
-                box_ids, = self.tracker.advance(bboxes, mid_frame)
-                with open(scores_path, 'a+') as f:
-                    for bbox, pred, box_id in zip(bboxes, preds, box_ids):
-                        f.write(f'{self.tracker.current_task_id},{box_id},{str(bbox.tolist()).strip("[]")},{str(pred.tolist()).strip("[]")}\n')
+        if bboxes is not None and nbboxes is None:
+            box_ids, _ = self.tracker.advance(bboxes, mid_frame)
+            with open(scores_path, 'a+') as f:
+                for bbox, pred, box_id in zip(bboxes, preds, box_ids):
+                    f.write(f'{self.tracker.current_task_id},{box_id},{str(bbox.tolist()).strip("[]")},{str(pred.tolist()).strip("[]")}\n')
         else:
             box_ids = None
+        ids_boxes = [
+            self.tracker.advance(nbboxes[i], frame)
+            for i, frame in enumerate(frames)
+        ]
+        mid_ids, mid_boxes = ids_boxes[mid if mid is not None else half_left]
+        matching_index = match_boxes(mid_boxes, bboxes)
+
         for i, (alpha, frame) in enumerate(zip(alpha_ls, frames)):
-            if nbboxes is not None:
-                box_ids, frame_boxes = self.tracker.advance(nbboxes[i], frame)
-                frame = self.draw_one_frame(
+            box_ids, frame_boxes = ids_boxes[i]
+            if not draw_static_boxes:
+                frame_preds = [
+                    preds[matching_index[mid_ids.index(box_id)]]
+                    if box_id in mid_ids else torch.zeros_like(preds[0])
+                    for box_id in box_ids
+                ]
+                draw_img = self.draw_one_frame(
                     frame,
-                    preds=None,
+                    preds=frame_preds,
                     bboxes=frame_boxes,
                     box_ids=box_ids,
                     alpha=1,
                     text_alpha=text_alpha,
                 )
-            draw_img = self.draw_one_frame(
-                frame,
-                preds,
-                bboxes,
-                alpha=alpha,
-                text_alpha=text_alpha,
-                ground_truth=ground_truth,
-                # box_ids=box_ids,
-            )
+            else:
+                draw_img = self.draw_one_frame(
+                    frame,
+                    bboxes=frame_boxes,
+                    box_ids=box_ids,
+                    alpha=1,
+                    text_alpha=text_alpha,
+                )
+                draw_img = self.draw_one_frame(
+                    draw_img,
+                    preds=preds,
+                    bboxes=bboxes,
+                    box_ids=mid_ids,
+                    alpha=alpha,
+                    text_alpha=text_alpha,
+                    ground_truth=ground_truth,
+                )
             if adjusted:
                 draw_img = draw_img.astype("float32") / 255
 

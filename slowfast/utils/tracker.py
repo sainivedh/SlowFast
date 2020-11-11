@@ -17,13 +17,17 @@ from deep_sort.detection import Detection
 from deep_sort import nn_matching
 
 
+def to_tlwh(bb):
+    """Takes a box of tlbr and returns a tlwh"""
+    w = bb[2] - bb[0]
+    h = bb[3] - bb[1]
+    return (bb[0], bb[1], w, h)
+
+
 def metrics(bb1, bb2):
-    def to_tuple(bb):
-        w = bb[2] - bb[0]
-        h = bb[3] - bb[1]
-        return (bb[1], bb[2], h, w)
-    i1, j1, h1, w1 = to_tuple(bb1)
-    i2, j2, h2, w2 = to_tuple(bb2)
+    """Computes metrics between two boxes"""
+    i1, j1, w1, h1 = to_tlwh(bb1)
+    i2, j2, w2, h2 = to_tlwh(bb2)
 
     top = max(i1, i2)
     bottom = min(i1 + h1, i2 + h2)
@@ -60,6 +64,29 @@ def metrics(bb1, bb2):
     return iou, hdiff, wdiff, cd
 
 
+def match_boxes(mid_boxes, bboxes):
+    """
+    Matches mid_boxes and bboxes using the euclidean distance
+    Parameters
+    ==========
+        mid_boxes: the output of the DeepSortTracker
+        bboxes: the input to the DeepSortTracker
+    Returns
+    =======
+        ordered_index: array an index array to go from mid_boxes to bboxes
+    """
+    score_matrix = np.zeros((len(mid_boxes), len(bboxes)))
+    for i, box in enumerate(bboxes):
+        for j, mid_box in enumerate(mid_boxes):
+            _, _, _, cd = metrics(mid_box, box)
+            score_matrix[j, i] = cd
+    col_idx, row_idx = linear_sum_assignment(score_matrix)
+    ordered_index = np.zeros((len(bboxes),), dtype=int)
+    for row, col in zip(row_idx, col_idx):
+        ordered_index[row] = col
+    return ordered_index
+
+
 def download_file(url, file_path):
     urllib.request.urlretrieve(url, file_path)
 
@@ -82,6 +109,7 @@ class DeepSortTracker():
 
     def advance(self, new_bounding_boxes, new_frame):
         features = self.encoder(new_frame, new_bounding_boxes)
+
         detections = [
             Detection(bbox, 1.0, feature)  # TODO: extract confidence from detectron2
             for bbox, feature in zip(new_bounding_boxes, features)
