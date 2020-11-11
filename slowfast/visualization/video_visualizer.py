@@ -146,9 +146,9 @@ class ImgVisualizer(Visualizer):
         # If the texts does not fit in the assigned location,
         # we split the text and draw it in another place.
         if top_corner:
-            num_text_split = self._align_y_top(
+            num_text_split = int(self._align_y_top(
                 box_coordinate, len(text_ls), text_box_width
-            )
+            ))
             y_corner = 1
         else:
             num_text_split = int(len(text_ls) - self._align_y_bottom(
