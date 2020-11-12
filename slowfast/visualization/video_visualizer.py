@@ -10,7 +10,7 @@ from detectron2.utils.visualizer import Visualizer
 
 import slowfast.utils.logging as logging
 from slowfast.utils.misc import get_class_names
-from slowfast.utils.tracker import DeepSortTracker, match_boxes
+from slowfast.utils.tracker import HungarianTracker
 from slowfast.utils.parser import load_config, parse_args
 
 logger = logging.get_logger(__name__)
@@ -394,7 +394,7 @@ class VideoVisualizer:
             self._get_thres_array(common_class_names=common_class_names)
 
         self.color_map = plt.get_cmap(colormap)
-        self.tracker = DeepSortTracker()
+        self.tracker = HungarianTracker()
 
     def _get_color(self, class_id):
         """
@@ -658,14 +658,13 @@ class VideoVisualizer:
             self.tracker.advance(nbboxes[i], frame)
             for i, frame in enumerate(frames)
         ]
-        mid_ids, mid_boxes = ids_boxes[mid if mid is not None else half_left]
-        matching_index = match_boxes(mid_boxes, bboxes)
+        mid_ids, _ = ids_boxes[mid if mid is not None else half_left]
 
         for i, (alpha, frame) in enumerate(zip(alpha_ls, frames)):
             box_ids, frame_boxes = ids_boxes[i]
             if not draw_static_boxes:
                 frame_preds = [
-                    preds[matching_index[mid_ids.index(box_id)]]
+                    preds[mid_ids.index(box_id)]
                     if box_id in mid_ids else torch.zeros_like(preds[0])
                     for box_id in box_ids
                 ]
