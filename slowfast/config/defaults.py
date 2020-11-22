@@ -767,6 +767,9 @@ _C.DEMO.SCORES_FILE_PATH = "scores.csv"
 # Whether or not to draw the still boxes
 _C.DEMO.DRAW_STATIC_BOXES = True
 
+# alpha parameter between iou and deep score
+_C.DEMO.ALPHA = 0.5
+
 # Path to best predicted classes
 _C.DEMO.PREDICTIONS_FILE_PATH = "predictions.json"
 

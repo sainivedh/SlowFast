@@ -170,11 +170,12 @@ def track_builder(max_history, max_age):
 
 
 class HungarianTracker:
-    def __init__(self, max_history=120, max_age=50):
+    def __init__(self, alpha=0.5, max_history=120, max_age=50):
         self.current_task_id = 0
         self.track_builder = track_builder(max_history, max_age)
         self.tracks = []
         self.id_counter = 0
+        self.alpha = alpha
         self.encoder = load_encoder()
 
     def new_id(self):
@@ -252,7 +253,7 @@ class HungarianTracker:
                     ],
                     track,
                 )
-                new_matrix[j, i] = iou + score
+                new_matrix[j, i] = self.alpha * iou + (1 - self.alpha) * score
         row_idx, col_idx = linear_sum_assignment(new_matrix, maximize=True)
 
         ids = []

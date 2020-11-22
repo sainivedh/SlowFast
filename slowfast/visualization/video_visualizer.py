@@ -394,7 +394,9 @@ class VideoVisualizer:
             self._get_thres_array(common_class_names=common_class_names)
 
         self.color_map = plt.get_cmap(colormap)
-        self.tracker = HungarianTracker()
+        args = parse_args()
+        cfg = load_config(args)
+        self.tracker = HungarianTracker(alpha=cfg.DEMO.ALPHA)
 
     def _get_color(self, class_id):
         """
