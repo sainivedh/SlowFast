@@ -649,18 +649,15 @@ class VideoVisualizer:
             mid_frame = frames[mid]
         else:
             mid_frame = frames[half_left]
-        if bboxes is not None and nbboxes is None:
-            box_ids, _ = self.tracker.advance(bboxes, mid_frame)
-            with open(scores_path, 'a+') as f:
-                for bbox, pred, box_id in zip(bboxes, preds, box_ids):
-                    f.write(f'{self.tracker.current_task_id},{box_id},{str(bbox.tolist()).strip("[]")},{str(pred.tolist()).strip("[]")}\n')
-        else:
-            box_ids = None
+
         ids_boxes = [
             self.tracker.advance(nbboxes[i], frame)
             for i, frame in enumerate(frames)
         ]
         mid_ids, _ = ids_boxes[mid if mid is not None else half_left]
+        with open(scores_path, 'a+') as f:
+            for bbox, pred, box_id in zip(bboxes, preds, mid_ids):
+                f.write(f'{self.tracker.current_task_id},{box_id},{str(bbox.tolist()).strip("[]")},{str(pred.tolist()).strip("[]")}\n')
 
         for i, (alpha, frame) in enumerate(zip(alpha_ls, frames)):
             box_ids, frame_boxes = ids_boxes[i]
