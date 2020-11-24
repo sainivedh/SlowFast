@@ -20,6 +20,8 @@ def get_best_predictions(scores):
         Args:
             scores (dict): dict contains the score for each class
     """
+    scores = {class_name:round(score,4) for class_name, score in scores.items()}
+
     if mode == 'top-k':
         if top_k>len(scores):
             return scores
@@ -35,10 +37,14 @@ def get_best_predictions(scores):
         return scores
 
 class_names, _, _ = get_class_names(class_names_path)
-predictions = []
 file = np.genfromtxt(scores_path,delimiter=',')
 
+task_predictions = {}
+person_predictions = {}
+frame_number = file[0][0]
+
 for line in file:
+    # get prediction scores
     prediction_scores = {class_name:score for class_name, score in zip(class_names, line[6:])}
     prediction_scores = dict( sorted(prediction_scores.items(),
                            key=lambda item: item[1],
@@ -49,10 +55,34 @@ for line in file:
                   'top_left_y':line[3],
                   'bottom_right_x':line[4],
                   'bottom_right_y':line[5]}
-    predictions.append({'task_id':int(line[0]),
-                        'box_id': int(line[1]), 
-                        'box':box_coords,
-                        'predictions':prediction_scores})
+
+    # assign predictions by person
+    box_id = int(line[1])
+    if box_id not in list(person_predictions.keys()): 
+        person_predictions[box_id] = {'total':0}
+    
+    person_predictions[box_id]['total'] += 1
+
+    if not prediction_scores.keys():
+        if 'nothing' in person_predictions[box_id].keys():   
+            person_predictions[box_id]['nothing'] += 1
+        else:
+            person_predictions[box_id]['nothing'] = 1
+
+    for prediction in prediction_scores.keys():
+        if prediction in person_predictions[box_id].keys():
+            person_predictions[box_id][prediction] += 1
+        else:
+            person_predictions[box_id][prediction] = 1
+    
+    # assign predictions by task 
+    task_id = int(line[0]/frame_number)
+    if task_id not in task_predictions.keys():
+        task_predictions[task_id] = {}
+
+    task_predictions[task_id][box_id] = prediction_scores
+
+predictions = {'by person': person_predictions, 'by task':task_predictions}
 
 with open(predictions_path, 'w') as f:
     json.dump(predictions, f, indent=4)
