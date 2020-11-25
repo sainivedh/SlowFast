@@ -448,6 +448,8 @@ class VideoVisualizer:
             top_scores, top_classes = [None] * n_instances, preds
 
         elif self.mode == "top-k":
+            if isinstance(preds, list):
+                preds = torch.stack(preds)
             top_scores, top_classes = torch.topk(preds, k=self.top_k)
             top_scores, top_classes = top_scores.tolist(), top_classes.tolist()
         elif self.mode == "thres":

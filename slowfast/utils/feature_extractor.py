@@ -5,6 +5,7 @@ import argparse
 import numpy as np
 import cv2
 import tensorflow.compat.v1 as tf
+import torch
 
 #tf.compat.v1.disable_eager_execution()
 
@@ -27,7 +28,11 @@ def _run_in_batches(f, data_dict, out, batch_size):
 
 
 def extract_image_patch(image, bbox, patch_shape=(64,128)):
-    x1, y1, x2, y2 = bbox.int()
+    if isinstance(bbox, torch.Tensor):
+        x1, y1, x2, y2 = bbox.int()
+    else:
+        x1, y1, x2, y2 = bbox.astype(int)
+
     image = image[y1:y2, x1:x2] # extract crop
     image = cv2.resize(image, patch_shape)
     return image
