@@ -248,12 +248,16 @@ class Detectron2Predictor:
         # TODO: batch frames
         bboxes = [self.predict_frame(frame) for frame in task.frames]
         ids_boxes = [
-            self.tracker.advance(bbox, frame)
+            self.tracker.advance(bbox.cpu().numpy(), frame)
             for bbox, frame in zip(bboxes, task.frames)
         ]
-        bboxes = [bbox for _, bbox in ids_boxes]
-        box_ids = [box_ids for box_ids, _ in ids_boxes]
 
+        # Move back to torch tensor on GPU
+        bboxes = [
+            torch.Tensor(bboxes).to(torch.device("cuda"))
+            for _, bboxes in ids_boxes
+        ]
+        box_ids = [box_ids for box_ids, _ in ids_boxes]
         pred_boxes = bboxes[len(task.frames) // 2]
 
         task.add_bboxes(pred_boxes)
