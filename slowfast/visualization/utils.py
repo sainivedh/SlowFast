@@ -38,6 +38,7 @@ def draw_predictions(task, video_vis):
     boxes = task.bboxes
     frames = task.frames
     preds = task.action_preds
+    box_ids = task.box_ids
     if boxes is not None:
         img_width = task.img_width
         img_height = task.img_height
@@ -61,6 +62,7 @@ def draw_predictions(task, video_vis):
                 preds,
                 boxes,
                 nbboxes=nbboxes,
+                nbox_ids=box_ids,
                 keyframe_idx=keyframe_idx,
                 # draw_range=draw_range,
             )
@@ -411,6 +413,7 @@ class TaskInfo:
         self.img_width = -1
         self.crop_size = -1
         self.clip_vis_size = -1
+        self.box_ids = []
 
     def add_frames(self, idx, frames):
         """
@@ -422,7 +425,16 @@ class TaskInfo:
         self.frames = frames
         self.id = idx
 
+    def add_box_ids(self, box_ids):
+        """
+        Add box ids
+        """
+        self.box_ids = box_ids
+
     def add_nbboxes(self, nbboxes):
+        """
+        Add bounding boxes
+        """
         self.nbboxes = nbboxes
 
     def add_bboxes(self, bboxes):

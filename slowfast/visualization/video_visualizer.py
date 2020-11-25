@@ -10,7 +10,6 @@ from detectron2.utils.visualizer import Visualizer
 
 import slowfast.utils.logging as logging
 from slowfast.utils.misc import get_class_names
-from slowfast.utils.tracker import HungarianTracker
 from slowfast.utils.parser import load_config, parse_args
 
 logger = logging.get_logger(__name__)
@@ -394,9 +393,7 @@ class VideoVisualizer:
             self._get_thres_array(common_class_names=common_class_names)
 
         self.color_map = plt.get_cmap(colormap)
-        args = parse_args()
-        cfg = load_config(args)
-        self.tracker = HungarianTracker(alpha=cfg.DEMO.ALPHA)
+        self.current_task_id = 0
 
     def _get_color(self, class_id):
         """
@@ -592,6 +589,7 @@ class VideoVisualizer:
         preds,
         bboxes=None,
         nbboxes=None,
+        nbox_ids=None,
         text_alpha=0.5,
         ground_truth=False,
         keyframe_idx=None,
@@ -641,26 +639,16 @@ class VideoVisualizer:
                 np.linspace(1, 0, num=half_right),
             ]
         )
-        text_alpha = text_alpha
         frames = frames[repeated_seq]
         img_ls = []
 
-        if mid is not None:
-            mid_frame = frames[mid]
-        else:
-            mid_frame = frames[half_left]
-
-        ids_boxes = [
-            self.tracker.advance(nbboxes[i], frame)
-            for i, frame in enumerate(frames)
-        ]
-        mid_ids, _ = ids_boxes[mid if mid is not None else half_left]
+        mid_ids = nbox_ids[mid if mid is not None else half_left]
         with open(scores_path, 'a+') as f:
             for bbox, pred, box_id in zip(bboxes, preds, mid_ids):
-                f.write(f'{self.tracker.current_task_id},{box_id},{str(bbox.tolist()).strip("[]")},{str(pred.tolist()).strip("[]")}\n')
+                f.write(f'{self.current_task_id},{box_id},{str(bbox.tolist()).strip("[]")},{str(pred.tolist()).strip("[]")}\n')
+            self.current_task_id += 1
 
-        for i, (alpha, frame) in enumerate(zip(alpha_ls, frames)):
-            box_ids, frame_boxes = ids_boxes[i]
+        for alpha, frame, frame_boxes, box_ids in zip(alpha_ls, frames, nbboxes, nbox_ids):
             if not draw_static_boxes:
                 frame_preds = [
                     preds[mid_ids.index(box_id)]
