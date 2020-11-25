@@ -14,6 +14,7 @@ from slowfast.datasets import cv2_transform
 from slowfast.models import build_model
 from slowfast.utils import logging
 from slowfast.visualization.utils import process_cv2_inputs, draw_predictions
+from slowfast.utils.tracker import DeepSortTracker
 
 logger = logging.get_logger(__name__)
 
@@ -218,6 +219,7 @@ class Detectron2Predictor:
         logger.info("Initialized Detectron2 Object Detection Model.")
 
         self.predictor = DefaultPredictor(self.cfg)
+        self.tracker = DeepSortTracker()
 
     def predict_frame(self, frame):
         """
@@ -243,12 +245,19 @@ class Detectron2Predictor:
                 prediction values (a tensor) and the corresponding boxes for
                 action detection task.
         """
-        middle_frame = task.frames[len(task.frames) // 2]
-        pred_boxes = self.predict_frame(middle_frame)
-        task.add_bboxes(pred_boxes)
-
         # TODO: batch frames
-        nbboxes = [self.predict_frame(frame) for frame in task.frames]
-        task.add_nbboxes(nbboxes)
-       
+        bboxes = [self.predict_frame(frame) for frame in task.frames]
+        ids_boxes = [
+            self.tracker.advance(bbox, frame)
+            for bbox, frame in zip(bboxes, task.frames)
+        ]
+        bboxes = [bbox for _, bbox in ids_boxes]
+        box_ids = [box_ids for box_ids, _ in ids_boxes]
+
+        pred_boxes = bboxes[len(task.frames) // 2]
+
+        task.add_bboxes(pred_boxes)
+        task.add_nbboxes(bboxes)
+        task.add_box_ids(box_ids)
+
         return task
