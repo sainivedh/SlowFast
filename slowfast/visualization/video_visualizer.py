@@ -655,9 +655,11 @@ class VideoVisualizer:
             for i, frame in enumerate(frames)
         ]
         mid_ids, _ = ids_boxes[mid if mid is not None else half_left]
+
         with open(scores_path, 'a+') as f:
-            for bbox, pred, box_id in zip(bboxes, preds, mid_ids):
-                f.write(f'{self.tracker.current_task_id},{box_id},{str(bbox.tolist()).strip("[]")},{str(pred.tolist()).strip("[]")}\n')
+            for i, (box_ids, bboxes) in enumerate(ids_boxes):
+                for box_id, bbox, pred in zip(box_ids, bboxes, preds):
+                    f.write(f'{self.tracker.current_task_id},{i},{box_id},{str(bbox.tolist()).strip("[]")},{str(pred.tolist()).strip("[]")}\n')
 
         for i, (alpha, frame) in enumerate(zip(alpha_ls, frames)):
             box_ids, frame_boxes = ids_boxes[i]
