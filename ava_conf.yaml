@@ -89,6 +89,7 @@ DEMO:
     "sit",
     "lie/sleep",
     "bend/bow",
+    "hand wave"
   ]
   COMMON_CLASS_THRES: 0.7
   UNCOMMON_CLASS_THRES: 0.3
